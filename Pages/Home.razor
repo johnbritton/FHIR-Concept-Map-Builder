@@ -2,38 +2,113 @@
 
 <PageTitle>Home</PageTitle>
 
-<MudContainer Class="mt-16 px-8" MaxWidth="MaxWidth.False">
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Standard" Variant="Variant.Text">Some Content <MudIcon Icon="@Icons.Material.Filled.Favorite" Color="@Color.Warning" /> follows here</MudField>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Filled" Variant="Variant.Filled">Some Content <MudIcon Icon="@Icons.Material.Filled.Favorite" Color="@Color.Warning" /> follows here</MudField>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Outlined" Variant="Variant.Outlined">Some Content <MudIcon Icon="@Icons.Material.Filled.Favorite" Color="@Color.Warning" /> follows here</MudField>
-        </MudItem>
-    </MudGrid>
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Standard" Variant="Variant.Text"></MudField>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Filled" Variant="Variant.Filled"></MudField>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Outlined" Variant="Variant.Outlined"></MudField>
-        </MudItem>
-    </MudGrid>
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Standard" Variant="Variant.Text" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.CheckCircle" AdornmentColor="Color.Success"></MudField>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Filled" Variant="Variant.Filled" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Money"></MudField>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="4">
-            <MudField Label="Outlined" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Warning" AdornmentColor="Color.Warning"></MudField>
-        </MudItem>
-    </MudGrid>
-</MudContainer>
+@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JS
+@using Hl7.Fhir.Model
+@using Task = System.Threading.Tasks.Task;
+
+<MudGrid Class="pa-4">
+    <MudItem xs="12" sm="7">
+        <MudForm @ref="_form" Model="viewModel" @bind-IsValid="@_success" @bind-Errors="@_errors" OnEnterPressed="@(() => _form.Validate())">
+            <MudStack Spacing="5">
+                <MudTextField T="string" Label="ID" Required="true" RequiredError="ID is required" @bind-Value="viewModel.ID" />
+                <MudTextField T="string" Label="Name" Required="true" RequiredError="Name is required" @bind-Value="viewModel.Name" />
+                <MudTextField T="string" Label="URL" Required="true" RequiredError="URL is required" Validation="@(new UrlAttribute { ErrorMessage = @"The URL is invalid" })" @bind-Value="viewModel.URL" />
+                <MudTextField T="string" Label="Version" Required="true" RequiredError="Version is required" @bind-Value="viewModel.Version" />
+                <MudTextField T="string" Label="Title" Required="true" RequiredError="Title is required" @bind-Value="viewModel.Title" />
+                <MudSelect T="PublicationStatus" Label="Status" Required="true" RequiredError="Status is required" @bind-Value="viewModel.Status">
+                    <MudSelectItem Value="PublicationStatus.Draft">Draft</MudSelectItem>
+                    <MudSelectItem Value="PublicationStatus.Active">Active</MudSelectItem>
+                    <MudSelectItem Value="PublicationStatus.Retired">Retired</MudSelectItem>
+                    <MudSelectItem Value="PublicationStatus.Unknown">Unknown</MudSelectItem>
+                </MudSelect>
+                <MudSwitch T="bool" Color="Color.Primary" Label="Experimental" @bind-Checked="viewModel.Experimental"></MudSwitch>
+                <MudTextField T="string" Label="Date" InputType="InputType.Date" @bind-Value="viewModel.Date"></MudTextField>
+                <MudTextField T="string" Label="Description" Sizing="InputSizing.Auto" @bind-Value="viewModel.Description"></MudTextField>
+                <MudTextField T="string" Label="Purpose" @bind-Value="viewModel.Purpose"></MudTextField>
+
+                @foreach (var codeMap in viewModel.CodeMaps)
+                {
+                    <MudCard Outlined="true">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">Code Map</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudIconButton OnClick="() => codeMap.Expanded = !codeMap.Expanded" Icon="@(codeMap.Expanded? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Color="Color.Default" />
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudCollapse Expanded="codeMap.Expanded">
+                                <MudDivider></MudDivider>
+                                <MudStack Spacing="5">
+                                    <MudTextField T="string" Label="Source Code System" @bind-Value="codeMap.SourceCode"></MudTextField>
+                                    <MudTextField T="string" Label="Target Code System" @bind-Value="codeMap.TargetCode"></MudTextField>
+                                    <MudTextField T="string" Label="Mapping" Sizing="InputSizing.Auto" Lines="5" MaxLines="20" @bind-Value="codeMap.Mapping"></MudTextField>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => viewModel.CodeMaps.Remove(codeMap))">Remove Code Map</MudButton>
+                                </MudStack>
+                            </MudCollapse>
+                        </MudCardContent>
+                    </MudCard>
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => viewModel.CodeMaps.Add(new CodeMapViewModel()))">Add Code Map</MudButton>
+            </MudStack>
+            <MudButton Variant="Variant.Filled" Disabled="!_success" Color="Color.Primary" OnClick="() => Generate()">Generate</MudButton>
+        </MudForm>
+    </MudItem>
+</MudGrid>
+
+
+@code {
+    private bool _success;
+    private MudForm _form;
+    private string[] _errors = [];
+    private ConceptMapViewModel viewModel = new ConceptMapViewModel();
+
+    async Task Generate()
+    {
+        await _form.Validate();
+        if (!_success) return;
+
+
+    }
+
+    class ConceptMapViewModel
+    {
+        public string? ID { get; set; }
+        public string? Name { get; set; }
+        public string? URL { get; set; }
+        public string? Version { get; set; }
+        public string? Title { get; set; }
+        public PublicationStatus Status { get; set; }
+        public bool Experimental { get; set; }
+        public string? Date { get; set; }
+        public string? Description { get; set; }
+        public string? Purpose { get; set; }
+
+        public List<CodeMapViewModel> CodeMaps { get; set; } = new List<CodeMapViewModel>() { new CodeMapViewModel() };
+    }
+
+    class CodeMapViewModel
+    {
+        public bool Expanded { get; set; } = true;
+        public string? SourceCode { get; set; }
+        public string? TargetCode { get; set; }
+        public string? Mapping { get; set; }
+    }
+    /*
+     * var map = new ConceptMap();
+map.Id = $"{siteName.Replace(" ", "").Replace("'", "")}-{resource}-{element}";
+map.Name = $"{siteName} {resource} {element} ConceptMap";
+map.Url = $"https://nhsnlink.org/fhir/ConceptMap/{map.Id}";
+map.Version = DateTime.Now.ToString("yyyyMMdd");
+map.Title = $"{siteName}'s {resource} {element} ConceptMap";
+map.Status = PublicationStatus.Draft;
+map.Experimental = true;
+map.Date = DateTime.Now.ToString("yyyy-MM-dd");
+map.Description = $"A mapping between the {siteName}'s {resource} {element} codes and CDC HSLoc codes";
+map.Purpose = $"To help implementers map from {siteName} to FHIR";
+map.Group = new List<ConceptMap.GroupComponent>();
+     */
+}

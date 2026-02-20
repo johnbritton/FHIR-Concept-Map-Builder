@@ -18,11 +18,21 @@
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+            <div style="width: 60px; height: 60px; border: 6px solid #f3f3f3; border-top: 6px solid #594ae2; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+            <p style="margin-top: 20px; font-family: 'Roboto', sans-serif; color: #594ae2; font-size: 18px;">Loading...</p>
+        </div>
+        <style>
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+        </style>
     </div>
 
     <div id="blazor-error-ui">
@@ -33,6 +43,7 @@
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <!-- Important: Increment the version parameter whenever you update MudBlazor to prevent caching issues -->
     <script src="_content/MudBlazor/MudBlazor.min.js?v=1"></script>
+    <script src="js/pasteHelper.js"></script>
 </body>
 
 </html>

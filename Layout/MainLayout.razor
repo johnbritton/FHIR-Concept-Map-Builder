@@ -1,7 +1,8 @@
 ﻿@inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
 
 @* Required *@
-<MudThemeProvider IsDarkMode="true" />
+<MudThemeProvider IsDarkMode="@isDarkMode" />
 <MudPopoverProvider />
 
 @* Needed for dialogs *@
@@ -12,26 +13,34 @@
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <h1>FHIR Concept Map Builder</h1>
         <MudSpacer />
-        <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End" />
+        <MudIconButton Icon="@modeIcon" Color="Color.Inherit" Edge="Edge.End" OnClick="() => toggleDarkMode()" />
     </MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="2">
-        <MudDrawerHeader>
-            <MudText Typo="Typo.h5" Class="mt-1">Application</MudText>
-        </MudDrawerHeader>
-        @* <NavMenu></NavMenu> *@
-    </MudDrawer>
     <MudMainContent>
         @Body
     </MudMainContent>
 </MudLayout>
 @code {
-    bool _drawerOpen = true;
+    bool isDarkMode;
+    string modeIcon = Icons.Material.Filled.WbSunny;
+    bool initialized = false;
 
-    void DrawerToggle()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _drawerOpen = !_drawerOpen;
+        if (firstRender)
+        {
+            isDarkMode = await JSRuntime.InvokeAsync<bool>("eval", "window.matchMedia('(prefers-color-scheme: dark)').matches");
+            modeIcon = isDarkMode ? Icons.Material.Filled.WbSunny : Icons.Material.Filled.NightsStay;
+            initialized = true;
+            StateHasChanged();
+        }
+    }
+
+    void toggleDarkMode()
+    {
+        isDarkMode = !isDarkMode;
+        modeIcon = isDarkMode ? Icons.Material.Filled.WbSunny : Icons.Material.Filled.NightsStay;
     }
 }
 
