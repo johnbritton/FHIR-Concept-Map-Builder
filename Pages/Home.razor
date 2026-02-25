@@ -5,6 +5,7 @@
 @using System.Text.RegularExpressions
 @using System.ComponentModel.DataAnnotations
 @inject IJSRuntime JS
+@using FHIR_Concept_Map_Builder.Forms
 @using Hl7.Fhir.Model
 @using Hl7.Fhir.Serialization
 @using Task = System.Threading.Tasks.Task;
@@ -12,55 +13,24 @@
 <MudGrid Class="pa-4">
     <MudItem xs="12" sm="6">
         <MudPaper Class="pa-4">
-            <MudForm @ref="_form" Model="viewModel" @bind-IsValid="@_success" @bind-Errors="@_errors" OnEnterPressed="@(() => _form.Validate())">
-                <MudStack Spacing="5">
-                    <MudTextField T="string" Label="ID" Required="true" RequiredError="ID is required" @bind-Value="viewModel.ID" Variant="Variant.Outlined" />
-                    <MudTextField T="string" Label="Name" Required="true" RequiredError="Name is required" @bind-Value="viewModel.Name" Variant="Variant.Outlined" />
-                    <MudTextField T="string" Label="URL" Required="true" RequiredError="URL is required" Validation="@(new UrlAttribute { ErrorMessage = @"The URL is invalid" })" @bind-Value="viewModel.URL" Variant="Variant.Outlined" />
-                    <MudTextField T="string" Label="Version" Required="true" RequiredError="Version is required" @bind-Value="viewModel.Version" Variant="Variant.Outlined" />
-                    <MudTextField T="string" Label="Title" Required="true" RequiredError="Title is required" @bind-Value="viewModel.Title" Variant="Variant.Outlined" />
-                    <MudSelect T="PublicationStatus" Label="Status" Required="true" RequiredError="Status is required" @bind-Value="viewModel.Status" Variant="Variant.Outlined">
-                        <MudSelectItem Value="PublicationStatus.Draft">Draft</MudSelectItem>
-                        <MudSelectItem Value="PublicationStatus.Active">Active</MudSelectItem>
-                        <MudSelectItem Value="PublicationStatus.Retired">Retired</MudSelectItem>
-                        <MudSelectItem Value="PublicationStatus.Unknown">Unknown</MudSelectItem>
-                    </MudSelect>
-                    <MudSwitch T="bool" Color="Color.Primary" Label="Experimental" @bind-Checked="viewModel.Experimental"></MudSwitch>
-                    <MudTextField T="string" Label="Date" InputType="InputType.Date" @bind-Value="viewModel.Date" Variant="Variant.Outlined"></MudTextField>
-                    <MudTextField T="string" Label="Description" Sizing="InputSizing.Auto" @bind-Value="viewModel.Description" Variant="Variant.Outlined"></MudTextField>
-                    <MudTextField T="string" Label="Purpose" @bind-Value="viewModel.Purpose" Variant="Variant.Outlined"></MudTextField>
-
-                    @foreach (var codeMap in viewModel.CodeMaps)
-                    {
-                        <MudCard Outlined="true">
-                            <MudCardHeader>
-                                <CardHeaderContent>
-                                    <MudText Typo="Typo.h6">Code Map</MudText>
-                                </CardHeaderContent>
-                                <CardHeaderActions>
-                                    <MudIconButton OnClick="() => codeMap.Expanded = !codeMap.Expanded" Icon="@(codeMap.Expanded? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Color="Color.Default" />
-                                </CardHeaderActions>
-                            </MudCardHeader>
-                            <MudCardContent>
-                                <MudCollapse Expanded="codeMap.Expanded">
-
-                                    <MudStack Spacing="5">
-                                        <MudTextField T="string" Label="Source Code System" @bind-Value="codeMap.SourceCode" Variant="Variant.Outlined"></MudTextField>
-                                        <MudTextField T="string" Label="Target Code System" @bind-Value="codeMap.TargetCode" Variant="Variant.Outlined"></MudTextField>
-                                        <MudTextField T="string" Label="Mapping" Sizing="InputSizing.Auto" 
-                                        Lines="5" MaxLines="20"
-                                        @bind-Value="codeMap.Mapping"
-                                        HelperText="Copy/paste from Excel. 1 code mapping per line. A tab separating the source code and target code." Variant="Variant.Outlined"></MudTextField>
-                                        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="@(() => viewModel.CodeMaps.Remove(codeMap))" Class="align-self-start">Remove Code Map</MudButton>
-                                    </MudStack>
-                                </MudCollapse>
-                            </MudCardContent>
-                        </MudCard>
-                    }
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => viewModel.CodeMaps.Add(new CodeMapViewModel()))" Class="align-self-start">Add Code Map</MudButton>
-                </MudStack>
-                <MudButton Variant="Variant.Filled" Disabled="!_success" Color="Color.Primary" OnClick="() => Generate()" Class="mt-4 align-self-start">Generate</MudButton>
-            </MudForm>
+            <MudSelect T="Mode" Label="Mode" Required="true" RequiredError="Mode is required" @bind-Value="selectedMode" Variant="Variant.Outlined">
+                <MudSelectItem Value="Mode.Generic">Generic</MudSelectItem>
+                <MudSelectItem Value="Mode.NHSNLinkEncounter">NHSNLink Encounter</MudSelectItem>
+                <MudSelectItem Value="Mode.NHSNLinkLocation">NHSNLink Location</MudSelectItem>
+            </MudSelect>
+            <MudDivider Class="mt-2 mb-2"></MudDivider>
+            @if (selectedMode == Mode.Generic)
+            {
+                <GenericForm Submitted="jsonGenerated"></GenericForm>
+            }
+            else if(selectedMode == Mode.NHSNLinkEncounter)
+            {
+                <NHSNLinkEncounterForm Submitted="jsonGenerated"></NHSNLinkEncounterForm>
+            }
+            else if(selectedMode == Mode.NHSNLinkLocation)
+            {
+                <NHSNLinkLocationForm Submitted="jsonGenerated"></NHSNLinkLocationForm>
+            }
         </MudPaper>
     </MudItem>
     <MudItem xs="12" sm="6">
@@ -72,95 +42,20 @@
 
 
 @code {
-    private bool _success;
-    private MudForm _form;
-    private string[] _errors = [];
-    private ConceptMapViewModel viewModel = new ConceptMapViewModel();
-    private string conceptMapJson;
+    
+    private string conceptMapJson = "";
+    private Mode selectedMode = Mode.Generic;
 
-    async Task Generate()
+    void jsonGenerated(string json)
     {
-        await _form.Validate();
-        if (!_success) return;
-
-        var map = new ConceptMap();
-        map.Id = viewModel.ID;
-        map.Name = viewModel.Name;
-        map.Url = viewModel.URL;
-        map.Version = viewModel.Version;
-        map.Title = viewModel.Title;
-        map.Status = viewModel.Status;
-        map.Experimental = viewModel.Experimental;
-        map.Date = viewModel.Date;
-        map.Description = viewModel.Description;
-        map.Purpose = viewModel.Purpose;
-        map.Group = new List<ConceptMap.GroupComponent>();
-        foreach (var codeMap in viewModel.CodeMaps)
-        {
-            ConceptMap.GroupComponent group = new ConceptMap.GroupComponent();
-            group.Source = codeMap.SourceCode;
-            group.Target = codeMap.TargetCode;
-            group.Element = new List<ConceptMap.SourceElementComponent>();
-            if (string.IsNullOrEmpty(codeMap.Mapping)) continue;
-            var maps = codeMap.Mapping.Split(Environment.NewLine);
-            foreach (var mapping in maps)
-            {
-                var parts = mapping.Split("\t");
-                if (parts.Length < 2) continue;
-                var elementComponent = new ConceptMap.SourceElementComponent();
-                elementComponent.Code = parts[0];
-                elementComponent.Target = new List<ConceptMap.TargetElementComponent>
-                {
-                    new ConceptMap.TargetElementComponent
-                    {
-                        Code = parts[1],
-                        //Display = descriptionMap.ContainsKey(targetCode) ? descriptionMap[targetCode] : display
-                        //Display = parts[2]
-                    }
-                };
-                group.Element.Add(elementComponent);
-            }
-            ;
-            map.Group.Add(group);
-        }
-        conceptMapJson = map.ToJson(true);
+        conceptMapJson = json;
+        StateHasChanged();
     }
 
-    class ConceptMapViewModel
+    enum Mode
     {
-        public string? ID { get; set; }
-        public string? Name { get; set; }
-        public string? URL { get; set; }
-        public string? Version { get; set; }
-        public string? Title { get; set; }
-        public PublicationStatus Status { get; set; }
-        public bool Experimental { get; set; }
-        public string? Date { get; set; }
-        public string? Description { get; set; }
-        public string? Purpose { get; set; }
-
-        public List<CodeMapViewModel> CodeMaps { get; set; } = new List<CodeMapViewModel>() { new CodeMapViewModel() };
+        Generic,
+        NHSNLinkLocation,
+        NHSNLinkEncounter
     }
-
-    class CodeMapViewModel
-    {
-        public bool Expanded { get; set; } = true;
-        public string? SourceCode { get; set; }
-        public string? TargetCode { get; set; }
-        public string? Mapping { get; set; }
-    }
-    /*
-     * var map = new ConceptMap();
-map.Id = $"{siteName.Replace(" ", "").Replace("'", "")}-{resource}-{element}";
-map.Name = $"{siteName} {resource} {element} ConceptMap";
-map.Url = $"https://nhsnlink.org/fhir/ConceptMap/{map.Id}";
-map.Version = DateTime.Now.ToString("yyyyMMdd");
-map.Title = $"{siteName}'s {resource} {element} ConceptMap";
-map.Status = PublicationStatus.Draft;
-map.Experimental = true;
-map.Date = DateTime.Now.ToString("yyyy-MM-dd");
-map.Description = $"A mapping between the {siteName}'s {resource} {element} codes and CDC HSLoc codes";
-map.Purpose = $"To help implementers map from {siteName} to FHIR";
-map.Group = new List<ConceptMap.GroupComponent>();
-     */
 }
