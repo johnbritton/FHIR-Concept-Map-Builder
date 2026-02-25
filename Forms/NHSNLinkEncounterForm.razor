@@ -1,6 +1,60 @@
-﻿<h3>NHSNLinkEncounterForm</h3>
+﻿<MudForm @ref="_form" Model="viewModel" @bind-IsValid="@_success" @bind-Errors="@_errors" OnEnterPressed="@(() => _form.Validate())">
+    <MudStack Spacing="5">
+        <MudTextField T="string" Label="Site ID" Required="true" RequiredError="Site ID is required" @bind-Value="viewModel.SiteId" HelperText="Ex: mercy" Variant="Variant.Outlined" />
+        <MudTextField T="string" Label="Site Name" Required="true" RequiredError="Site name is required" @bind-Value="viewModel.SiteName" HelperText="Ex: Mercy Hospital" Variant="Variant.Outlined" />
+        <MudSelect T="EHRVendor ?" Label="EHR Vendor" @bind-Value="viewModel.Vendor" Variant="Variant.Outlined">
+            <MudSelectItem T="EHRVendor?" Value="@(EHRVendor.Epic)">Epic</MudSelectItem>
+            <MudSelectItem T="EHRVendor?" Value="@(EHRVendor.Cerner)">Cerner</MudSelectItem>
+            <MudSelectItem T="EHRVendor?" Value="@(EHRVendor.Other)">Other</MudSelectItem>
+        </MudSelect>
+        @if (viewModel.Vendor == EHRVendor.Epic)
+        {
+            <MudTextField T="string" Label="Epic Site Identifier" @bind-Value="viewModel.EpicSiteIdentifier" HelperText="Ex: 1.2.840.114350.1.13.{Epic Site Identifier}.2.7.2.686980" Variant="Variant.Outlined" />
+        }
+        else if (viewModel.Vendor == EHRVendor.Cerner)
+        {
+            <MudTextField T="string" Label="Cerner Site Identifier" @bind-Value="viewModel.CernerSiteIdentifier" HelperText="The client ID from the site's FHIR base API URL'" Variant="Variant.Outlined" />
+        }
+        <MudCard Outlined="true">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Code Map</MudText>
+                </CardHeaderContent>
+                <CardHeaderActions>
+                    <MudIconButton OnClick="() => viewModel.CodeMap.Expanded = !viewModel.CodeMap.Expanded" Icon="@(viewModel.CodeMap.Expanded? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Color="Color.Default" />
+                </CardHeaderActions>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudCollapse Expanded="viewModel.CodeMap.Expanded">
+
+                    <MudStack Spacing="5">
+                        <MudTextField T="string" Label="Mapping" Sizing="InputSizing.Auto"
+                                      Lines="5" MaxLines="20"
+                                      @bind-Value="viewModel.CodeMap.Mapping"
+                                      HelperText="Copy/paste from Excel. 1 code mapping per line. A tab separating the source code and target code." Variant="Variant.Outlined"></MudTextField>
+                    </MudStack>
+                </MudCollapse>
+            </MudCardContent>
+        </MudCard>
+    </MudStack>
+    <MudButton Variant="Variant.Filled" Disabled="!_success" Color="Color.Primary" OnClick="() => Generate()" Class="mt-4 align-self-start">Generate</MudButton>
+</MudForm>
 
 @code {
     [Parameter]
     public EventCallback<string> Submitted { get; set; }
+
+    private bool _success;
+    private MudForm _form;
+    private string[] _errors = [];
+    private NHSNLinkEncounterFormViewModel viewModel = new NHSNLinkEncounterFormViewModel();
+
+    async Task Generate()
+    {
+        await _form.Validate();
+        if (!_success) return;
+
+        var json = ConceptMapBuilder.ToJson(viewModel);
+        await Submitted.InvokeAsync(json);
+    }
 }

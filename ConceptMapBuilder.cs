@@ -6,6 +6,52 @@ namespace FHIR_Concept_Map_Builder;
 
 public static class ConceptMapBuilder
 {
+    public static string ToJson(NHSNLinkEncounterFormViewModel viewModel)
+    {
+        var map = new ConceptMap();
+        map.Id = $"{viewModel.SiteId}-encounter-type";
+        map.Name = $"{viewModel.SiteName} Encounter.Type ConceptMap";
+        map.Url = $"https://nhsnlink.org/fhir/ConceptMap/{map.Id}";
+        map.Version = DateTime.Now.ToString("yyyyMMdd");
+        map.Title = $"{viewModel.SiteName} Encounter.Type ConceptMap";
+        map.Status = PublicationStatus.Draft;
+        map.Experimental = true;
+        map.Date = DateTime.Now.ToString("yyyy-MM-dd");
+        map.Description = $"A mapping between the {viewModel.SiteName} encounter type codes and SNOMED CT codes";
+        map.Purpose = $"To help implementers map encounters from {viewModel.SiteName} to SNOMED CT";
+        map.Group = new List<ConceptMap.GroupComponent>();
+        ConceptMap.GroupComponent group = new ConceptMap.GroupComponent();
+        if (viewModel.Vendor == EHRVendor.Epic)
+        {
+            group.Source = $"urn:oid:1.2.840.114350.1.13.{viewModel.EpicSiteIdentifier}.2.7.10.698084.10110";
+        }
+        else if (viewModel.Vendor == EHRVendor.Cerner)
+        {
+            group.Source = $"https://fhir.cerner.com/{viewModel.CernerSiteIdentifier}/codeSet/71";
+        }
+        else
+        {
+            group.Source = viewModel.CodeMap.SourceCode;
+        }
+        group.Target = "http://snomed.info/sct";
+        group.Element = new List<ConceptMap.SourceElementComponent>();
+        splitMapping(viewModel.CodeMap, group);
+        fillEncounterDisplay(group);
+        map.Group.Add(group);
+        if (viewModel.Vendor == EHRVendor.Epic)
+        {
+            ConceptMap.GroupComponent groupSandbox = new ConceptMap.GroupComponent();
+            groupSandbox.Source = $"urn:oid:1.2.840.114350.1.13.{viewModel.EpicSiteIdentifier}.3.7.10.698084.10110";
+            groupSandbox.Target = "http://snomed.info/sct";
+            groupSandbox.Element = new List<ConceptMap.SourceElementComponent>();
+            splitMapping(viewModel.CodeMap, groupSandbox);
+            fillEncounterDisplay(groupSandbox);
+            map.Group.Add(groupSandbox);
+        }
+
+        return map.ToJson(true);
+    }
+
     public static string ToJson(NHSNLinkLocationFormViewModel viewModel)
     {
         var map = new ConceptMap();
@@ -58,9 +104,22 @@ public static class ConceptMapBuilder
         {
             var target = element.Target.FirstOrDefault();
             if (target == null) continue;
-            if (string.IsNullOrEmpty(target.Display) && HsLocCodes.Codes.ContainsKey(target.Code))
+            if (string.IsNullOrEmpty(target.Display) && CodeDictionaries.HsLocCodes.ContainsKey(target.Code))
             {
-                target.Display = HsLocCodes.Codes[target.Code];
+                target.Display = CodeDictionaries.HsLocCodes[target.Code];
+            }
+        }
+    }
+
+    private static void fillEncounterDisplay(ConceptMap.GroupComponent group)
+    {
+        foreach (var element in group.Element)
+        {
+            var target = element.Target.FirstOrDefault();
+            if (target == null) continue;
+            if (string.IsNullOrEmpty(target.Display) && CodeDictionaries.SnomedCodes.ContainsKey(target.Code))
+            {
+                target.Display = CodeDictionaries.SnomedCodes[target.Code];
             }
         }
     }
@@ -143,6 +202,17 @@ public class NHSNLinkLocationFormViewModel
     public string? SiteId { get; set; }
     public EHRVendor? Vendor { get; set; }
     public string? EpicSiteIdentifier { get; set; }
+
+    public CodeMapViewModel CodeMap { get; set; } = new CodeMapViewModel();
+}
+
+public class NHSNLinkEncounterFormViewModel
+{
+    public string? SiteName { get; set; }
+    public string? SiteId { get; set; }
+    public EHRVendor? Vendor { get; set; }
+    public string? EpicSiteIdentifier { get; set; }
+    public string? CernerSiteIdentifier { get; set; }
 
     public CodeMapViewModel CodeMap { get; set; } = new CodeMapViewModel();
 }

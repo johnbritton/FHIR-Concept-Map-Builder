@@ -1,8 +1,8 @@
 ﻿namespace FHIR_Concept_Map_Builder;
 
-public static class HsLocCodes
+public static class CodeDictionaries
 {
-    public static readonly Dictionary<string, string> Codes = new()
+    public static readonly Dictionary<string, string> HsLocCodes = new()
     {
         { "1026-4", "Burn Critical Care" },
         { "1042-1", "Pediatric Burn Critical Care" },
@@ -229,5 +229,15 @@ public static class HsLocCodes
         { "1265-8", "Inpatient Psychiatric Facility Unit(s)" },
         { "1264-1", "Inpatient Rehabilitation Facility Unit(s)" },
         { "1263-3", "Non-CMS Hospital Units" }
+    };
+
+    public static readonly Dictionary<string, string> SnomedCodes = new()
+    {
+        { "4525004", "Emergency department patient visit (procedure)" },
+        { "183452005", "Emergency hospital admission (procedure)" },
+        { "32485007", "Hospital admission (procedure)" },
+        { "8715000", "Hospital admission, elective (procedure)" },
+        { "448951000124107", "Admission to observation unit (procedure)" },
+
     };
 }
